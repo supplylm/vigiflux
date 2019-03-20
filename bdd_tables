@@ -1,0 +1,398 @@
+*create
+	schema "COMMANDES";*/
+
+grant all privileges on
+all tables in schema "COMMANDES" to admvgf ;
+-- select version();
+ /************************************************************
+           TABLES DE REFERENCES PERIODE D'AGREGATION
+****************************************************************/
+ --USE "COMMANDES";  
+-- drop table "COMMANDES".TB_PERIODE_AGREGATION;
+
+ create table "COMMANDES".TB_PERIODE_AGREGATION 
+ 	(DATE_DEBUT_PERIODE timestamp not null,DATE_FIN_PERIODE timestamp not null,TYPE_AGREGATION integer not null,
+	 primary key (DATE_DEBUT_PERIODE ,DATE_FIN_PERIODE ,TYPE_AGREGATION) );
+
+/***************************************************
+                  ENTREPOT
+**************************************************************/
+-- drop table "COMMANDES".TB_ENTREPOT;
+
+  create table "COMMANDES".TB_ENTREPOT 
+  	(ID_ENTREPOT varchar(20) not null,NOM_ENTREPOT varchar(50) not null,NUM_ENTREPOT int not null,LS int default 0,
+	CC int default 0,DO_WEB_OMS int default 0,DO_WEB_WMS int default 0,ORDRE_AFFICHAGE int default 99,
+	primary key (ID_ENTREPOT) );
+
+insert into"COMMANDES".TB_ENTREPOT (ID_ENTREPOT,NOM_ENTREPOT,NUM_ENTREPOT,LS,CC,DO_WEB_OMSDO_WEB_WMS,ORDRE_AFFICHAGE)
+	values ('001-E-128','Chalons',128,1,1,0,0,99) ,('001-E-136','Plateforme Saint-Ouen',136,0,0,0,0,99) ,
+	('001-E-141','Plateforme Carros',141,0,0,0,0,99) ,('001-E-170','Plateforme Ivry',170,0,0,0,0,99) ,
+	('001-E-356','KTO Izegem',356,0,0,0,0,99) ,('001-E-357','Dourges',357,1,1,1,1,99) ,
+	('001-E-359','Valence',359,1,1,1,1,99) ,('001-E-430','Mazeres',430,1,1,0,0,99) ,
+	('001-E-433','Web',433,1,1,1,1,99) ,('001-E-435','IDF 0',435,1,1,1,1,99) ;
+
+insert into "COMMANDES".TB_ENTREPOT (ID_ENTREPOT,NOM_ENTREPOT,NUM_ENTREPOT,LS,CC,DO_WEB_OMS,DO_WEB_WMS,ORDRE_AFFICHAGE) 
+	values ('001-E-443','Chemillé ',443,1,1,0,0,99) ,('001-E-450','Dourges 2',450,1,1,1,1,99) ,
+	('001-E-447','Dourges 2',447,1,1,0,0,99) ,('001-E-451','GRANS',451,1,1,0,0,99) ,
+	('001-M-014','VALENCIENNES',14,0,0,1,0,99) ,('001-M-045','MASSY',45,0,0,1,0,99) ,
+	('015-E-091','Adeo Anvers',91,0,0,0,0,99) ,('017-M-906','Weldom',906,0,0,1,0,99) ;
+
+/***********************************************
+               DO LIBERES D'OMS
+*****************************************************/
+-- drop table "COMMANDES".TB_DO_WEB_LIBERES_OMS_IMPORT;
+
+create table "COMMANDES".TB_DO_WEB_LIBERES_OMS_IMPORT 
+	( ID_DO int not null,ID_ENTREPOT varchar(20) not null,DATE_LAST_UPDATE timestamp not null,
+	primary key (ID_DO ,DATE_LAST_UPDATE) );
+
+create index TB_DO_WEB_LIBERES_OMS_IMPORT_IX1 on
+	"COMMANDES".TB_DO_WEB_LIBERES_OMS_IMPORT(DATE_LAST_UPDATE);
+
+--drop table "COMMANDES".TB_DO_WEB_LIBERES_OMS ;
+create table "COMMANDES".TB_DO_WEB_LIBERES_OMS
+	( DATE_NB_DO timestamp not null,ID_ENTREPOT varchar(20) not null,NB_DO_OMS int not null,
+	primary key (DATE_NB_DO ,ID_ENTREPOT) );
+
+/*********************************************************
+	DO COMMANDES WEB INTEGRES DANS WMS
+***************************************************************/
+--drop table "COMMANDES".TB_DO_WEB_WMS_IN_IMPORT;
+
+create table "COMMANDES".TB_DO_WEB_WMS_IN_IMPORT 
+	( ID_DO int not null,ID_ENTREPOT varchar(20) not null,DATE_LAST_UPDATE timestamp not null,
+	 primary key (ID_DO ,DATE_LAST_UPDATE) );
+
+create index IXTB_DO_WEB_WMS_IN_IMPORT_IX1 on
+	"COMMANDES".TB_DO_WEB_WMS_IN_IMPORT(DATE_LAST_UPDATE);
+
+--drop table "COMMANDES".TB_DO_WEB_WMS_IN;
+
+createtable "COMMANDES".TB_DO_WEB_WMS_IN 
+	( DATE_NB_DO timestamp not null,ID_ENTREPOT varchar(20) not null,NB_DO int not null,
+	primary key (DATE_NB_DO ,ID_ENTREPOT) );
+
+/******************************************************
+                  CMD WEB livrees 
+******************************************************/
+--drop table "COMMANDES".TB_CMDE_WEB_IMPORT;
+create table "COMMANDES".TB_CMDE_WEB_IMPORT
+	( CMDE_WEB_ID varchar(25) not null primary key,DATE_INTEGRATION_OMS timestamp not null );
+
+--drop table "COMMANDES".TB_CMDE_WEB;
+create table "COMMANDES".TB_CMDE_WEB
+	( DATE_INTEGRATION_OMS timestamp not null,NB_CMDE_WEB_J int not null,NB_CMDE_WEB_J7 int null,
+	NB_CMDE_WEB_J14 int null,NB_CMD_J7_J14_MOYEN int null,
+	primary key (DATE_INTEGRATION_OMS) );
+
+create index TB_CMDE_WEB_IMPORT_IX1 on
+	"COMMANDES".TB_CMDE_WEB_IMPORT(DATE_INTEGRATION_OMS);
+
+/**********************************************
+		     MODELES
+********************************************/
+--drop table "COMMANDES".TB_MODELES_EXEC_IMPORT;
+create table "COMMANDES".TB_MODELES_EXEC_IMPORT 
+	( NOM_MODELE varchar(30) not null, TEMPLATE_MODELE varchar(30) not null,DATE_EXECUTION timestamp null,
+	RUN varchar(30) not null,RUN_PRECEDENT varchar(30) null );
+
+create index IXTB_MODELES_EXEC_IMPORT_1 on
+	"COMMANDES".TB_MODELES_EXEC_IMPORT(DATE_EXECUTION);
+
+--drop table "COMMANDES".TB_MODELES_EXEC;
+create table "COMMANDES".TB_MODELES_EXEC 
+	( TEMPLATE_MODELE varchar(30) not null,DATE_CALCUL timestamp not null,INDICATEUR_FEU int not null );
+
+/*******************************************************
+		SAGES
+************************************************/
+--drop table "COMMANDES".TB_SAGES;
+create table "COMMANDES".TB_SAGES
+	( ID_MAGASIN varchar(10) not null, INDICATEUR_RUN varchar(2) not null,NOM_MAGASIN varchar(40) not null );
+
+/**********************************************
+		CMD / DO BLOQUES
+****************************************************/
+--drop table "COMMANDES".TB_IND_CMD_WEB_BLQ;
+create table "COMMANDES".TB_IND_CMD_WEB_BLQ 
+	( DATE_INDICATEUR timestamp not null,NOM_INDICATEUR varchar(30) not null,NB_CALCULE int not null,
+	primary key (DATE_INDICATEUR ,NOM_INDICATEUR) );
+
+/**************************************
+	CMD WEB REJET INTEG
+********************************************/
+--drop table "COMMANDES".TB_CMD_WEB_REJET_INTEG;	
+create table "COMMANDES".TB_CMD_WEB_REJET_INTEG 
+	( DATE_INDICATEUR timestamp not null,NB_CMD int not null,
+	primary key (DATE_INDICATEUR) );
+
+/********************************************
+	SO LS Intégrés OMS
+**********************************************/
+--drop table "COMMANDES".TB_SO_LS_IMPORT;		
+create table"COMMANDES".TB_SO_LS_IMPORT 
+	( ID_ENTREPOT varchar(20) not null,ID_DO varchar(20) not null,
+	DATE_INTEGRATION_DO timestamp not null );
+
+--drop table "COMMANDES".TB_SO_LS ;	
+create table"COMMANDES".TB_SO_LS 
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	NB_LIGNES_DO_HISTO_MOYEN_J7_J14 int default 0,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+
+create index IXTB_SO_LS_IMPORT_1 on
+	"COMMANDES".TB_SO_LS_IMPORT(DATE_INTEGRATION_DO);
+
+/****************************************
+	DO LS libérés OMS
+******************************************/
+--drop table "COMMANDES".TB_DO_LS_IMPORT ;	
+create table "COMMANDES".TB_DO_LS_IMPORT ( ID_ENTREPOT varchar(20) not null,
+		ID_DO varchar(20) not null,
+		DATE_LIBERATION_DO timestamp not null );
+
+--drop table "COMMANDES".TB_DO_LS ;	
+
+create table "COMMANDES".TB_DO_LS
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,
+	DATE_INDICATEUR timestamp not null,NB_LIGNES_DO_HISTO_MOYEN_J7_J14 int default 0,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+create index IXTB_DO_LS_IMPORT_1 on
+	"COMMANDES".TB_DO_LS_IMPORT(DATE_LIBERATION_DO);
+
+/************************************
+	MSG MIF DO LS
+Attention l'indicateur est deja calculé , on insert ou on update les valeurs
+au fur et a mesure de la journée 
+*************************************/
+
+--drop table "COMMANDES".TB_DO_LS_MSG_MIF_IMPORT;	
+create table "COMMANDES".TB_DO_LS_MSG_MIF_IMPORT ( ID_ENTREPOT varchar(20) not null,
+		NB_DO int not null,
+		NB_LIGNE_DO int not null,
+		DATE_CALCUL timestamp not null );
+
+--drop table "COMMANDES".TB_DO_LS_MSG_MIF;	
+
+create table "COMMANDES".TB_DO_LS_MSG_MIF 
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+/*********************************************
+	DO LS Intégrés WMS
+****************************************/
+
+--drop table "COMMANDES".TB_DO_LS_WMS_IN_IMPORT;
+
+create table "COMMANDES".TB_DO_LS_WMS_IN_IMPORT 
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNE_DO int not null,
+	DATE_INTEGRATION_DO timestamp not null );
+
+--drop table "COMMANDES".TB_DO_LS_WMS_IN;
+create table "COMMANDES".TB_DO_LS_WMS_IN
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+/*****************************************
+	CC liberes OMS
+*****************************************/
+--drop table "COMMANDES".TB_DO_CC_LIBERES_IMPORT;	
+create table "COMMANDES".TB_DO_CC_LIBERES_IMPORT 
+	( ID_DO varchar(20) not null,DATE_LIBERATION_DO timestamp not null,ID_ENTREPOT varchar(20) not null );
+
+create index IXTB_DO_CC_LIBERES_IMPORT_1 on
+	"COMMANDES".TB_DO_CC_LIBERES_IMPORT(DATE_LIBERATION_DO);
+
+--drop table "COMMANDES".TB_DO_CC_LIBERES;
+
+create table "COMMANDES".TB_DO_CC_LIBERES
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	 NB_LIGNES_DO_MOYEN_J7_J14 int not null default 0,primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+/********************************************************************************
+			MSG MIF DO CC
+Attention l'indicateur est deja calculé , on insert ou on update les valeurs
+au fur et a mesure de la journée 
+********************************************************************************/
+--drop table "COMMANDES".TB_DO_CC_MSG_MIF_IMPORT;	
+create table "COMMANDES".TB_DO_CC_MSG_MIF_IMPORT 
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNE_DO int not null,DATE_CALCUL timestamp not null );
+
+--drop table "COMMANDES".TB_DO_CC_MSG_MIF;	
+create table "COMMANDES".TB_DO_CC_MSG_MIF 
+	( ID_ENTREPOT varchar(20) not null,NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+/*********************************************
+		CC intégrés WMS
+**********************************************/
+--drop table "COMMANDES".TB_DO_CC_WMS_IN_IMPORT;	
+create table "COMMANDES".TB_DO_CC_WMS_IN_IMPORT 
+	( ID_DO varchar(20) not null,DATE_INTEGRATION_DO timestamp not null,ID_ENTREPOT varchar(20) not null );
+
+create index IXTB_DO_CC_WMS_IN_IMPORT_1 on
+	"COMMANDES".TB_DO_CC_WMS_IN_IMPORT(DATE_INTEGRATION_DO);
+
+--drop table "COMMANDES".TB_DO_CC_WMS_IN;	
+
+create table "COMMANDES".TB_DO_CC_WMS_IN
+	( ID_ENTREPOT varchar(20) not null, NB_DO int not null,NB_LIGNES_DO int not null,DATE_INDICATEUR timestamp not null,
+	NB_LIGNE_DO_HISTO_MOYEN_J7_J14 int not null default 0,
+	primary key (ID_ENTREPOT,DATE_INDICATEUR) );
+
+/******************************************************************************
+        GESTION DES ALERTES
+*****************************************************************************/
+/**********************************
+	  msg_debug
+**********************************/
+
+
+--DROP TABLE "COMMANDES".msg_debug;
+
+CREATE TABLE "COMMANDES".msg_debug 
+	(id_message serial NOT NULL,msg varchar(5000) NULL);
+
+
+
+/******************************************
+	parametre_globale
+*******************************************/
+
+
+-- Drop table
+
+--DROP TABLE "COMMANDES".tb_param_globale;
+
+CREATE TABLE "COMMANDES".tb_param_globale (
+	id_parametre serial NOT NULL,
+	parametre varchar(255) NULL,
+	valeur_parametre varchar(255) NULL,
+	manuel_execute varchar(255) NULL
+);
+CREATE INDEX tb_param_globale_id_parametre_idx 
+	ON "COMMANDES".tb_param_globale USING btree (id_parametre, parametre, valeur_parametre, manuel_execute);
+
+insert into "COMMANDES".tb_param_globale (id_parametre,parametre,valeur_parametre)
+	values (1,'DEBUG_CALCUL_ALERTE_CDE_BLQ_DO_CREATED','0') ,
+	(2,'DEBUG_CALCUL_ALERTE_CDE_BLQ_SOURCED','0') ,
+	(3,'DEBUG_CALCUL_ALERTE_CDE_REJET_INTG','0') ,
+	(4,'DEBUG_CALCUL_ALERTE_CMD_WEB','0') ,
+	(5,'DEBUG_CALCUL_ALERTE_DO_CC_OMS_RELEASE','0') ,
+	(6,'DEBUG_CALCUL_ALERTE_DO_CC_WMS_CREATED','0') ,
+	(7,'DEBUG_CALCUL_ALERTE_DO_LS_OMS_CREATED','0') ,
+	(8,'DEBUG_CALCUL_ALERTE_DO_LS_WMS_CREATED','0') ,
+	(9,'DEBUG_CALCUL_ALERTE_DO_WEB_LIBERES_OMS','0') ,
+	(10,'DEBUG_CALCUL_ALERTE_DO_WEB_WMS_CREATED','0') ,
+	(11,'DEBUG_CALCUL_ALERTE_JG_SAGES','0') ,
+	(12,'DEBUG_CALCUL_ALERTE_MOD_ALLOCATION','0') ,
+	(13,'DEBUG_CALCUL_ALERTE_MOD_DO_CREATED','0') ,
+	(14,'DEBUG_CALCUL_ALERTE_MOD_DO_RELEASE','0') ,
+	(15,'DEBUG_CALCUL_ALERTE_MOD_DO_RELEASE','0');
+
+/**************************************
+	traitement alerte 
+******************************************/
+
+
+
+--drop table "COMMANDES".tb_traitement_alerte ;
+
+ create table "COMMANDES".tb_traitement_alerte
+    ( id_traitement serial primary key, nom_traitement varchar(50) not null,
+	 date_traitement timestamp not null, status_traitement integer not null );
+
+/*********************************************
+		tb_ alerte
+*************************************************/
+
+
+--drop table "COMMANDES".tb_alerte;
+
+create	table "COMMANDES".tb_alerte 
+     ( id_alerte serial primary key,id_traitement int4 not null,
+	code_alerte varchar(50) not null,date_debut timestamp not null,
+	date_prise_compte timestamp null,date_esca1 timestamp null,
+	date_esca2 timestamp null,date_fin timestamp null,
+	status_alerte int4 null,status_message int4 null,
+	complement_message varchar(255) ,
+	constraint tb_alerte_tb_traitement_alerte_fk foreign key (id_traitement) 
+	references "COMMANDES".tb_traitement_alerte(id_traitement) );
+
+create index tb_alerte_id_alerte_idx 
+	on "COMMANDES".tb_alerte using btree (id_alerte,id_traitement,code_alerte,date_debut,
+	date_prise_compte,date_esca1,date_esca2,date_fin,status_alerte,status_messagecomplement_message);
+
+
+
+/****************************************************
+	detail_msg_alerte
+****************************************************/
+
+
+--DROP TABLE "COMMANDES".tb_detail_msg_alerte;
+
+CREATE TABLE "COMMANDES".tb_detail_msg_alerte
+	(code_alerte varchar(255) NOT NULL,msg_mail varchar(255) NULL,mess_sms varchar(255) NULL,
+	notification varchar(255) NULL,destinataire_mail varchar(500) NULL,
+	CONSTRAINT to_correspondence_pk PRIMARY KEY (code_alerte)
+);
+CREATE INDEX to_correspondence_code_alerte_idx 
+ON "COMMANDES".tb_detail_msg_alerte USING btree (code_alerte, msg_mail, mess_sms, notification);
+
+
+insert into "COMMANDES".tb_detail_msg_alerte(code_alerte,msg_mail,mess_sms,notification)
+	values ('GF_DOW_WMS_CREATED_1','Plus de liberation des DO WMS depuis plus de deux heures','Plus de liberation des DO WMS depuis plus de deux heures','Plus de liberation des DO WMS depuis plus de deux heures') ,
+	('CB_CDE_WEB_LIVREES_1','Alerte sur les commandes WEB livrees, plus d intégration depuis plusieurs quart d heure','Alerte sur les commandes WEB livrees, plus d intégration depuis plusieurs quart d heures','Alerte sur les commandes WEB livrees, plus d intégration depuis plusieurs quart d heure')  ,
+	('CB_CDE_WEB_LIVREES_2','Alerte sur les commandes WEB livrees, baisse significative des commandes par rapport a l historique moyen','Alerte sur les commandes WEB livrees, baisse significative des commandes par rapport a l historique moyen','Alerte sur les commandes WEB livrees, baisse significative des commandes par rapport a l historique moyen')  ,
+	('FR_MOD_ALLOCATION_1','Alerte sur la modele ALLOCATION depuis une heure','Alerte sur la modele ALLOCATION depuis une heure', 'Alerte sur la modele ALLOCATION depuis une heure')  ,
+	('FR_MOD_DO_CREATED_1','Alerte sur la modele DO CREATED depuis une heure','Alerte sur la modele DO CREATED depuis une heure', 'Alerte sur la modele DO CREATED depuis une heure')  , 
+	('FR_MOD_DO_RELEASE_1','Alerte sur la modele DO RELEASE depuis une heure','Alerte sur la modele DO RELEASE depuis une heure', 'Alerte sur la modele DO RELEASE depuis une heure')  ,
+    ('GF_CDE_BLQ_DO_CREATED','Alerte le nombre de commande web DO CREATED bloqué est inférieur  à l indicateur ','Alerte le nombre de commande web DO CREATED bloqué est inférieur  à l indicateur ', 'Alerte le nombre de commande web DO CREATED bloqué est inférieur  à l indicateur ')  ,
+    ('GF_CDE_BLQ_SOURCED_1','Alerte le nombre de commande SOURCED bloqué est inférieur  à l indicateur ','Alerte le nombre de commande SOURCED bloqué est inférieur  à l indicateur ', 'Alerte le nombre de commande SOURCED bloqué est inférieur  à l indicateur ')  ,
+    ('GF_CDE_REJET_INTG_1','Alerte le nombre de commandé WEB rejetée est inférieur de l indicateur ','Alerte le nombre de commandé WEB rejetée est inférieur de l indicateur ', 'Alerte le nombre de commandé WEB rejetée est inférieur de l indicateur ')  ,  		
+    ('GF_DOW_OMS_RELEASE_1','Plus de liberation des DO WEB depuis plus de deux heures ','Plus de liberation des DO WEB depuis plus de deux heures ', 'Plus de liberation des DO WEB depuis plus de deux heures')  ,
+	('GF_DOW_WMS_CREATED_2','Trop d ecart entre OMS sortie ET WMS inseree pour les entrepots :% ','Trop d ecart entre OMS sortie ET WMS inseree pour les entrepots :% ', 'Trop d ecart entre OMS sortie ET WMS inseree pour les entrepots :%')  ,
+	('JG_SAGES_1','Alerte le nombre de Magasin sans proposition de Commande dépasse 56 Magasins','Alerte le nombre de Magasin sans proposition de Commande dépasse 56 Magasins', 'Alerte le nombre de Magasin sans proposition de Commande dépasse 56 Magasins')  ,  
+	('TB_DOCC_OMS_RELEASE_1','Alerte sur les lignes de commandes DO_CC_LIBERES du jour inférieur à l histoqrique des commandes','Alerte sur les lignes de commandes DO_CC_LIBERES du jour inférieur à l histoqrique des commandes', 'Alerte sur les lignes de commandes DO_CC_LIBERES du jour inférieur à l histoqrique des commandes')  ,  
+	('TB_DOCC_WMS_CREATED_1','Alerte sur les lignes d intégration Do  à WMS (DO_CC_LIEBERES / DO_CC_WMS_IN) par entrepot','Alerte sur les lignes d intégration Do  à WMS (DO_CC_LIEBERES / DO_CC_WMS_IN) par entrepot', 'Alerte sur les lignes d intégration Do  à WMS (DO_CC_LIEBERES / DO_CC_WMS_IN) par entrepot')  ,  
+	('TB_DOLS_OMS_CREATED_1','Pas d integration en amont ','Pas d integration en amont ', 'Pas d integration en amont ')  ,  
+	('TB_DOLS_OMS_CREATED_2','Baisse significative de l intégration dans l OMS des lignes de DO LS pour les entrepots : %','Baisse significative de l intégration dans l OMS des lignes de DO LS pour les entrepots : %', 'Baisse significative de l intégration dans l OMS des lignes de DO LS pour les entrepots : %')  ,
+	('TB_DOLS_OMS_RELEASE_1','Alerte sur les lignes de commandes SO_LS parrapport à do_ls','Alerte sur les lignes de commandes SO_LS parrapport à do_ls', 'Alerte sur les lignes de commandes SO_LS parrapport à do_ls')  ,
+	('TB_DOLS_WMS_CREATED_1','Alerte le nombre de ligne de commande DO_LS est inférieur à l indicateur','Alerte le nombre de ligne de commande DO_LS est inférieur à l indicateur', 'Alerte le nombre de ligne de commande DO_LS est inférieur à l indicateur');
+
+
+/*********************************************************
+		seuil alerte
+**************************************************/
+
+
+--drop table "COMMANDES".tb_seuils_alerte;
+
+CREATE TABLE "COMMANDES".tb_seuils_alerte (
+	code_alerte varchar(30) NOT NULL,code_parametre varchar(30) NOT NULL,description_parametre varchar(255) NOT NULL,
+	valeur_parametre varchar(30) NOT NULL,date_debut_validite timestamp NOT NULL,date_fin_validite timestamp NULL,
+	CONSTRAINT tb_parametre_alerte_pk PRIMARY KEY (code_alerte, code_parametre),
+	CONSTRAINT tb_seuils_alerte_tb_detail_msg_alerte_fk FOREIGN KEY (code_alerte) REFERENCES "COMMANDES".tb_detail_msg_alerte(code_alerte)
+);
+
+insert into "COMMANDES".tb_seuils_alerte (code_alerte,code_parametre,description_parametre,valeur_parametre,date_debut_validite)
+	values ('GF_DOW_WMS_CREATED_1','NBRE_HEURES_WMS','Nombre d heures ou il faut controler les DO OMS integre dans WMS',2.2,'2019-02-11 12:00:00') ,
+	('GF_CDE_BLQ_DO_CREATED','IND_CDE_BLQ_DO_CREATED','Nombre des lignes web do created bloqués,  à ne pas dépasser',80,'2019-02-11 12:00:00') ,
+	('FR_MOD_DO_RELEASE_1','NB_HEURES','Nombre d heures ou il faut controler le Model DO_RELEASE de l indicateur_feu ',6,'2019-02-11 12:00:00') ,
+	('TB_DOLS_WMS_CREATED_1','NB_POUR_DOLS_WMS_CREATED','Pourcentage de nombre de lignes de commandes DO_LS / DO_LS_WMS_IN , à ne pas dépasser par entrepot',50,'2019-02-11 12:00:00') ,
+	('GF_CDE_BLQ_SOURCED_1','IND_CMD_WEB_BLQ','Nombre des lignes  web souced   bloqués à ne pas depasser',300,'2019-02-11 12:00:00') ,
+	('FR_MOD_ALLOCATION_1','NB_HEURES','Nombre d heure ou il faut controler le Model d allocation de l indicateur_feu',5,'2019-02-11 12:00:00') ,
+	('FR_MOD_DO_CREATED_1','NB_HEURES','Nombre d heures ou il faut controler le model DO CREATED de l indicateur feu ',6,'2019-02-11 12:00:00') ,
+	('JG_SAGES_1','NB_MAG','Nombre magasin sans proposition de commande ',56,'2019-02-11 12:00:00') ,
+	('GF_DOW_OMS_RELEASE_1','NBRE_HEURES','Nombre d heures ou il faut controler les DO liberes dans oms',2.2,'2019-02-11 12:00:00') ,
+	('TB_DOLS_OMS_CREATED_2','NB_POUCENTAGE_LS_OMS_CREATED','Pour chaque entrepot,Pourcentage de  difference entre NB_LIGNES_CMD du jour /histo_moyen_J7_J14',50,'2019-02-11 12:00:00') ,
+    ('CB_CDE_WEB_LIVREES_1','NB_QUART_HEURE','Nombre de quart heure ou il faut controler les cmd web',4,'2019-02-11 12:00:00') ,
+   ('TB_DOLS_OMS_CREATED_1','NB_LIGNES_DO_LS_OMS_CREATED','Nombre de lignes integres dans OMS dans les entrepots','','2019-02-11 12:00:00'),
+   ('GF_DOW_WMS_CREATED_2','DIFF_OMS_WMS','Total entre OMS entrant et WMS sortant par entrepot','','2019-02-11 12:00:00'),
+   ('GF_CDE_REJET_INTG_1','CDE_REJET_INTG','Nombre commande web rejetée à ne pas dépasser',20,'2019-02-11 12:00:00'),   
+   ('CB_CDE_WEB_LIVREES_2','NB_POURCENTAGE','Pourcentage du nombre de commande en moins à ne pas depasser par rapport a l historique',50,'2019-02-11 12:00:00'),
+   ('TB_DOLS_OMS_RELEASE_1','NB_POURCENTAGE_LS_RELEASE_OMS ',' Pourcentage de nombre de lignes de commandes  SO_LS/DO_LS , à ne pas dépasser  par entrepot',50,'2019-02-11 12:00:00'),
+   ('TB_DOCC_OMS_RELEASE_1','NB_POUR_DOCC_OMS_RELEASE ',' Pourcentage de nombre de lignes commandes DO_CC_LIEBERES du jour / histo_moyen_J7_J14 par entrepot',50,'2019-02-11 12:00:00'),
