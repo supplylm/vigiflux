@@ -1,0 +1,2042 @@
+grant all privileges on
+all tables in schema "COMMANDES" to admvgf ;
+
+/****************************************************************************************************************************************************************************************************
+                                                calcul_alerte_cde_blq_do_created
+**********************************************************************************************/
+
+
+
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_cde_blq_do_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+
+declare
+
+
+tot_nb_cmde_bloq integer := 0;
+IND_CDE_BLQ_DO_CREATED integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_CDE_BLQ_DO_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement ALERTE_CDE_BLQ_DO_CREATED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a les commandes bloquées parrapport au parametre indicateur dans la journée  */
+if retour = 0 then
+    n_alerte := 'GF_CDE_BLQ_DO_CREATED';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into ind_cde_blq_do_created
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='IND_CDE_BLQ_DO_CREATED'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||ind_cde_blq_do_created);  
+
+      -- Calcul de la dernière commande bloquee parrapport au parametre 
+  
+ 	 select nb_calcule 
+  	into tot_nb_cmde_bloq 
+  from "COMMANDES".tb_ind_cmd_web_blq  
+  where nom_indicateur= 'CMD_WEB_BLQ_DO_C' 
+  and date_indicateur=(select MAX(date_indicateur)from "COMMANDES".tb_ind_cmd_web_blq)
+  and date_indicateur >= (now() - '1 day'::interval);
+  
+   if tot_nb_cmde_bloq is null or tot_nb_cmde_bloq >= ind_cde_blq_do_created then
+     retour := 2;
+  end if;  
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='GF_CDE_BLQ_DO_CREATED' 
+    and date_fin is null;
+
+if retour = 0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('ALERTE_CDE_BLQ_DO_CREATED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement ALERTE_CDE_BLQ_DO_CREATED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_cde_blq_sourced
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_cde_blq_sourced()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+
+tot_nb_cmde_bloq integer := 0;
+IND_CMD_WEB_BLQ integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_CDE_BLQ_SOURCED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement ALERTE_CDE_BLQ_SOURCED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a les lignes  commandes web  bloquées parrapport au parametre indicateur dans la journée  */
+if retour= 0 then
+    n_alerte := 'GF_CDE_BLQ_SOURCED_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    select valeur_parametre
+  	  into ind_cmd_web_blq
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='IND_CMD_WEB_BLQ'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+    perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||ind_cmd_web_blq);  
+
+     -- Calcul de la dernière  commande bloquee parrapport au parametre 
+ 	 select nb_calcule 
+  	--   into tot_nb_cmde_bloq 
+       from "COMMANDES".tb_ind_cmd_web_blq  
+      where nom_indicateur= 'CMD_WEB_BLQ_SRC' 
+        and date_indicateur=(select MAX(date_indicateur) 
+                               from "COMMANDES".tb_ind_cmd_web_blq 
+                              where nom_indicateur= 'CMD_WEB_BLQ_SRC' 
+                                and date_trunc('day',date_indicateur) = date_trunc('day',now()));
+  
+   if tot_nb_cmde_bloq is null or tot_nb_cmde_bloq >= ind_cmd_web_blq then
+     retour := 2;
+  end if;  
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='GF_CDE_BLQ_SOURCED_1' 
+    and date_fin is null;
+
+if retour=0  then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('ALERTE_CDE_BLQ_SOURCED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement ALERTE_CDE_BLQ_SOURCED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_cde_rejet_intg
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_cde_rejet_intg()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+
+tot_nb_cmde_rejet integer := 0;
+cde_rejet_intg integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_CDE_REJET_INTG'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement ALERTE_CDE_REJET_INTG() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a les lignes de commandes bloquées parrapport au parametre indicateur de la journée  */
+if retour=0 then
+    n_alerte := 'GF_CDE_REJET_INTG_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into cde_rejet_intg
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='CDE_REJET_INTG'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||cde_rejet_intg);  
+
+      -- Calcul de la dernière  commande bloquee parrapport au paramaetre 
+  
+ 	 select nb_cmd
+  	  into tot_nb_cmde_rejet
+       from "COMMANDES".tb_cmd_web_rejet_integ
+      where  date_indicateur=(select MAX(date_indicateur) 
+                               from "COMMANDES".tb_cmd_web_rejet_integ 
+                              where date_trunc('day',date_indicateur) = date_trunc('day',now()));
+  
+   if tot_nb_cmde_rejet is null or tot_nb_cmde_rejet >= cde_rejet_intg then
+     retour := 2;
+  end if;  
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='GF_CDE_REJET_INTG_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('ALERTE_CDE_REJET_INTG',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement ALERTE_CDE_REJET_INTG() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_cmd_web
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_cmd_web()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare 
+
+
+nb_quart_heure integer := 0;
+tot_nb_cmde integer := 0;
+nb_pourcentage integer := 0;
+diff_prct integer := 0;
+num_seq integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte dÃ©ja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_CMD_WEB'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_CMD_WEB() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+/* Calcul de l'alerte : A-t-on integre des commandes depuis X 1/4 d'heure */
+if retour=0  then
+
+  n_alerte := 'CB_CDE_WEB_LIVREES_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into nb_quart_heure
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NB_QUART_HEURE'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+ 
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||nb_quart_heure);
+ 
+  -- Calcul du nombre de cmd cree sur les X derniers 1/4 heure'  
+  select sum(nb_cmde_web_j) 
+    into tot_nb_cmde
+    from "COMMANDES".tb_cmde_web
+   where date_integration_oms >= (now() - nb_quart_heure * (interval '15 minutes'));
+
+  if tot_nb_cmde is null or tot_nb_cmde = 0 then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+
+/* Calcul de l'alerte : a-t-on a integrer moins de X pourcentage de commande par rapport a l'historique */
+if retour=0 then
+    n_alerte := 'CB_CDE_WEB_LIVREES_2';
+    
+    -- Recuperateur du parametre de l'alerte
+	select valeur_parametre
+  	  into nb_pourcentage
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POURCENTAGE'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+    select ((sum(coalesce(nb_cmde_web_j,0))-sum(nb_cmd_j7_j14_moyen)) / sum(nb_cmd_j7_j14_moyen) ) * 100 
+      into diff_prct
+      from "COMMANDES".tb_cmde_web
+     where date_trunc('day',date_integration_oms) = date_trunc('day',now());
+    
+    if diff_prct is null or (diff_prct < nb_pourcentage) then 
+      retour := 2;
+    end if;  
+
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte in ('CB_CDE_WEB_LIVREES_1','CB_CDE_WEB_LIVREES_2') 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_3: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_CMD_WEB',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message)
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_CMD_WEB() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_cc_oms_release
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_cc_oms_release()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+NB_POUR_DOCC_OMS_RELEASE  integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+liste_entrepot varchar(300) := null;
+rec RECORD;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_CC_OMS_RELEASE'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement DEBUG_CALCUL_ALERTE_DO_CC_OMS_RELEASE() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on  LIBERER moins de nombre de ligne dans DO_CC_LIBERES par jour parrapport au j-14  par entrepot*/
+if retour=0 then
+    n_alerte := 'TB_DOCC_OMS_RELEASE_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into nb_pour_docc_oms_release 
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POUR_DOCC_OMS_RELEASE '
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+   -- Calcul le pourcentage de nombre de lignes liberes parrapport au l'historique dans  DO_CC_LIBERES par entrepot
+   
+   
+  begin
+	  
+  	 for rec in  (
+  	 select ((coalesce(nb_lignes_do,0) * 100) / (nb_lignes_do_moyen_j7_j14))as prct 
+  	 from "COMMANDES".tb_do_cc_liberes
+  	 where date_trunc('day',date_indicateur) = date_trunc('day',now())
+  	 and date_indicateur >= (now() - '1 day'::interval))
+	      
+  loop                
+      if (rec.prct) is null or ((rec.prct) < NB_POUR_DOCC_OMS_RELEASE)then  
+        if liste_entrepot is null then
+               liste_entrepot := rec.id_entrepot;
+            else 
+            
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.id_entrepot);
+			end if;
+       end if;      
+ end loop; 
+  if liste_entrepot is not null then 
+  
+      retour := 2;
+       end if;       
+ end;
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='TB_DOCC_OMS_RELEASE_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('DEBUG_CALCUL_ALERTE_DO_CC_OMS_RELEASE',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message,complement_message)
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement DEBUG_CALCUL_ALERTE_DO_CC_OMS_RELEASE() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_cc_wms_created
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_cc_wms_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+nb_pour_docc_wms_release integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+liste_entrepot varchar(300) := null;
+retour integer := 0;
+rec RECORD;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_CC_WMS_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement DEBUG_CALCUL_ALERTE_DO_CC_WMS_CREATED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a integrer moins de X pourcentage de commande WMS  par entrepot  */
+if retour=0 then
+    n_alerte := 'TB_DOCC_WMS_CREATED_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into nb_pour_docc_wms_release
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POUR_DOCC_WMS_RELEASE'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+   -- Calcul des lignes do integre dans DO_CC_LIBEREES  par rapport DO_CC_WMS_IN PAR ENTREPOT 
+   
+begin                
+   for rec in 
+   	(select ((coalesce(nbtdcl,0) * 100) / (nbtdlwi)) prct from 
+   	(select nb_lignes_do nbtdlwi, ENT.id_entrepot 
+  	 from "COMMANDES".tb_do_cc_wms_in TDCWI
+   	inner join "COMMANDES".TB_ENTREPOT ENT on ENT.num_entrepot =cast(TDCWI.id_entrepot as INTEGER)
+  	 where date_indicateur >= (now() - '1 day'::interval )) A ,
+   
+  	 (select  nb_lignes_do nbtdcl, id_entrepot 
+      from "COMMANDES".tb_do_cc_liberes tdcl
+  	   where date_indicateur >= (now() - '1 day'::interval )) B
+   
+  	 where B.id_entrepot = A.id_entrepot)
+    
+  loop                
+      if  (rec.prct) is null or ((rec.prct)  < NB_POUR_DOCC_WMS_RELEASE)then   
+       
+            if liste_entrepot is null then
+               liste_entrepot := rec.id_entrepot;
+            else 
+            
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.id_entrepot);
+			end if;
+       end if;      
+ end loop; 
+  if liste_entrepot is not null then 
+      retour := 2;
+       end if;      
+ end;   
+
+end if;
+
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='TB_DOCC_WMS_CREATED_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('DEBUG_CALCUL_ALERTE_DO_CC_WMS_CREATED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message,complement_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement DEBUG_CALCUL_ALERTE_DO_CC_WMS_CREATED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_ls_oms_created
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_ls_oms_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+nb_poucentage_ls_oms_created integer := 0;
+nb_lignes_do_ls_oms_created integer := 0;
+retour integer := 0;
+tot_nb_cmde integer := 0;
+rec record;
+flg_debug integer := 0;
+liste_entrepot varchar(300) := null;
+/* Code retour fonction
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_LS_OMS_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_DO_LS_OMS_CREATED()');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+ /* Calcul de l'alerte : A-t-on integre des DO dans OMS */
+ 
+if retour = 0 then
+
+  n_alerte := 'TB_DOLS_OMS_CREATED_1';
+   
+ 
+  -- Calcul du nombre de do integre dans oms'  
+  select sum(nb_lignes_do)
+    into nb_lignes_do_ls_oms_created
+    from "COMMANDES".tb_so_ls
+   where date_trunc('day',date_indicateur) = date_trunc('day',now());    
+
+  if (nb_lignes_do_ls_oms_created) is null or (nb_lignes_do_ls_oms_created) = 0 then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+ 
+
+ 
+
+/* Calcul de l'alerte : a-t-on a integrer moins de X pourcentage de commande so_ls par rapport a l'historique */
+if retour = 0 then
+
+    n_alerte := 'TB_DOLS_OMS_CREATED_2';
+    
+      -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into nb_poucentage_ls_oms_created
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POUCENTAGE_LS_OMS_CREATED'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+      
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_PARAMETRE : '||NB_POUCENTAGE_LS_OMS_CREATED); 
+
+   -- Calcul de la différence de ligne  DO  parrapport à l'historique(j-14)  par entrepot 
+   
+   
+  begin                
+  	 for rec in  (
+  	 select (coalesce(nb_lignes_do,0) * 100 / (nb_lignes_do_histo_moyen_j7_j14)) as prct ,id_entrepot 
+  	 from "COMMANDES".tb_so_ls 
+  	 where date_trunc('day',date_indicateur) = date_trunc('day',now()))
+	      
+  loop                
+      if (rec.prct) is null or ((rec.prct) < nb_poucentage_ls_oms_created)then   
+      
+            if liste_entrepot is null then
+               liste_entrepot := rec.id_entrepot;
+            else 
+            
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.id_entrepot);
+			end if;
+       end if;      
+ end loop; 
+  if liste_entrepot is not null then 
+         retour := 2;
+  end if;
+  end;
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte in ('TB_DOLS_OMS_CREATED_1','TB_DOLS_OMS_CREATED_2') 
+    and date_fin is null;
+
+if retour = 0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_DO_LS_OMS_CREATED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message,complement_message)
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_DO_LS_OMS_CREATED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_ls_oms_release
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_ls_oms_release()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+NB_POURCENTAGE_LS_RELEASE_OMS  integer := 0;
+tot_nb_mag integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+diff_prct integer := 0;
+retour integer := 0;
+rec RECORD;
+liste_entrepot varchar(300) := null;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_LS_OMS_RELEASE'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement DEBUG_CALCUL_ALERTE_DO_LS_OMS_RELEASE() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a integrer moins de nombre de ligne dans SO_LS que DO_LS par entrepot */
+if retour = 0 then
+    n_alerte := 'TB_DOLS_OMS_RELEASE_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into nb_pourcentage_ls_release_oms 
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POURCENTAGE_LS_RELEASE_OMS '
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+   -- Calcul le pourcentage de nombre de ligne intégré parrapport au DO_LS par entrepot
+   
+begin                
+   for rec in 
+   (select ((coalesce(A.nb_lignes_do,0) * 100) / (B.nb_lignes_do)) prct , A.id_entrepot entrepot from
+   
+     	(select nb_lignes_do , id_entrepot, date_indicateur
+	from "COMMANDES".tb_do_ls 
+ 	 where date_trunc('day',date_indicateur) = date_trunc('day',now()) )A ,  
+      
+      (select nb_lignes_do  , id_entrepot ,date_indicateur
+      from "COMMANDES".tb_so_ls  
+       where date_trunc('day',date_indicateur) = date_trunc('day',now())) B
+      
+      
+    	where  B.id_entrepot =A.id_entrepot
+		and date_trunc('day',B.date_indicateur) =date_trunc('day',A.date_indicateur)) 
+	
+	
+  loop                
+      if  (rec.prct)  is null or ( rec.prct < NB_POURCENTAGE_LS_RELEASE_OMS)then
+      
+        if liste_entrepot is null then
+               liste_entrepot := rec.entrepot;
+            else 
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.entrepot);
+			end if;
+       end if;      
+ end loop; 
+  if liste_entrepot is not null then 
+         retour := 2;
+  end if;
+  end;
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='TB_DOLS_OMS_RELEASE_1' 
+    and date_fin is null;
+
+if retour = 0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('DEBUG_CALCUL_ALERTE_DO_LS_OMS_RELEASE',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message,complement_message)
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement DEBUG_CALCUL_ALERTE_DO_LS_OMS_RELEASE() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_ls_wms_created
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_ls_wms_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+nb_pour_dols_wms_created integer := 0;
+tot_nb_mag integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+diff_prct integer := 0;
+retour integer := 0;
+liste_entrepot varchar(300) := null;
+rec RECORD;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_LS_WMS_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement DEBUG_CALCUL_ALERTE_DO_LS_WMS_CREATED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+
+/* Calcul de l'alerte : a-t-on a integrer moins de X pourcentage de commande par rapport a l'historique */
+ 
+if retour=0 then
+    n_alerte := 'TB_DOLS_WMS_CREATED_1';
+    
+    -- Recuperateur du parametre de l'alerte
+    	select valeur_parametre
+  	  into nb_pour_dols_wms_created
+  	  from "COMMANDES".tb_seuils_alerte
+  	 where code_parametre ='NB_POUR_DOLS_WMS_CREATED'
+       and code_alerte = n_alerte
+       and date_debut_validite <= now()
+       and date_fin_validite is null;
+  
+   -- Calcul de la somme de nombre des lignes do par jour et la somme des lignes do histo par entrepot 
+   
+begin                
+   for rec in 
+   	(select ((coalesce(nbtdl,0) * 100) / (nbtdlwi)) prct , A.id_entrepot entrepot from 
+   	(select nb_lignes_do nbtdlwi, ENT.id_entrepot 
+  	 from "COMMANDES".tb_do_ls_wms_in TDLWI
+  	 
+   	 inner join "COMMANDES".TB_ENTREPOT ENT on ENT.num_entrepot =cast(TDLWI.id_entrepot as INTEGER)
+  	 where date_indicateur >= (now() - '1 day'::interval )) A ,
+   
+  	 (select  nb_lignes_do nbtdl, id_entrepot 
+      from "COMMANDES".tb_do_ls tdl
+  	   where date_indicateur >= (now() - '1 day'::interval )) B
+   
+  	 where B.id_entrepot = A.id_entrepot)
+    
+  loop                
+      if  (rec.prct) is null or ((rec.prct)  < NB_POUR_DOLS_WMS_CREATED)then   
+          if liste_entrepot is null then
+               liste_entrepot := rec.entrepot;
+          else          
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.entrepot);
+	    end if;  
+	  end if;
+ end loop; 
+         if liste_entrepot is not null then 
+          retour := 2;
+      end if;      
+ end;   
+
+end if;
+
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='TB_DOLS_WMS_CREATED_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('DEBUG_CALCUL_ALERTE_DO_LS_WMS_CREATED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_alerte,complement_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement DEBUG_CALCUL_ALERTE_DO_LS_WMS_CREATED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_web_liberes_oms
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_web_liberes_oms()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+nbre_heures float := 0;
+tot_nb_do integer := 0;
+alerte_en_cours integer := null;
+flg_debug integer := 0;
+n_alerte varchar(30) := null;
+retour integer := 0;
+
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+
+begin
+	
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_WEB_LIBERES_OMS'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_DO_WEB_LIBERES_OMS() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+	
+ 
+ 
+ /* Calcul de l'alerte : A-t-on integre des DO depuis X heures */
+if retour=0 then
+
+ n_alerte := 'GF_DOW_OMS_RELEASE_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into nbre_heures
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NBRE_HEURES'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_PARAMETRE : '||nbre_heures);
+    
+   -- Calcul du nombre de DO depuis x heure'  
+  select sum(nb_do_oms)
+    into tot_nb_do
+    from "COMMANDES".tb_do_web_liberes_oms
+   where date_nb_do >= (now() - NBRE_HEURES * (interval '1 HOURS'));
+    
+
+  if tot_nb_do is null or tot_nb_do = 0 then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour); 
+    
+
+    
+  /*Y-a-t-il une alerte en cours ? */  
+
+
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='GF_DOW_OMS_RELEASE_1'
+    and date_fin is null;
+
+if retour=0 then
+
+     if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_DO_WEB_LIBERES_OMS',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message)
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_DO_WEB_LIBERES_OMS() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_do_web_wms_created
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_do_web_wms_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+NBRE_HEURES_WMS float := 0;
+DIFF_OMS_WMS integer := 0;
+tot_nb_do integer := 0;
+alerte_en_cours integer := null;
+flg_debug integer := 0;
+NB_TOTALE_IN_ENTROPORT integer := 0;
+NB_TOTALE_OUT_ENTROPORT integer := 0;
+diff_prct integer := 0;
+n_alerte varchar(30) := null;
+retour integer := 0;
+liste_entrepot varchar(300) := null;
+rec record;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+	
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_DO_WEB_WMS_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_DO_WEB_WMS_CREATED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+	
+ 
+ 
+ /* Calcul de l'alerte : A-t-on integre des DO depuis X heures */
+if retour = 0 then
+
+ n_alerte := 'GF_DOW_WMS_CREATED_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into NBRE_HEURES_WMS
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NBRE_HEURES_WMS'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+    
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_PARAMETRE : '||NBRE_HEURES_WMS);
+
+
+
+   -- Calcul du nombre de DO depuis X heures'  
+  select sum(nb_do) 
+  into tot_nb_do
+    from "COMMANDES".tb_do_web_wms_in
+   where date_nb_do >= (now() - NBRE_HEURES_WMS * (interval '1 HOURS'));
+ 
+  if tot_nb_do is null or tot_nb_do = 0 then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour); 
+
+   
+/* Calcul de l'alerte : existe il une difference entre les OMS sortant et WMS entrant */
+if retour = 0 then
+   
+  n_alerte := 'GF_DOW_WMS_CREATED_2'; 
+    
+    /* Comparaison  entre les OMS sortant et WMS entrant */
+  begin 
+	    	
+	for rec in (select A.som nb_wms, B.som nb_oms, A.ent entrepot from      
+   (select sum(nb_do) som , id_entrepot ent ,date_trunc('day',date_nb_do) dtt 
+      from "COMMANDES".tb_do_web_wms_in 
+      where date_nb_do >= (now() - NBRE_HEURES_WMS * (interval '1 HOURS'))
+    group by dtt, id_entrepot) A ,
+    
+   (select sum(nb_do_oms) som , l.id_entrepot ent ,date_trunc('day',l.date_nb_do) dt 
+      from "COMMANDES".tb_do_web_liberes_oms l
+     where l.date_nb_do >= (now() - NBRE_HEURES_WMS * (interval '1 HOURS'))
+      group by dt, l.id_entrepot) B ,
+      
+      (select e.nom_entrepot ent from "COMMANDES".tb_entrepot e where do_web_wms =1 ) c
+     
+    where  
+       A.ent = B.ent  and B.ent= c.ent and A.dtt = date_trunc('day',now()))    
+       
+    loop  
+
+  		if (rec.nb_oms !=0) and (rec.nb_wms =0)then 
+
+  		   if liste_entrepot is null then
+               liste_entrepot := rec.entrepot;
+           else 
+               liste_entrepot := concat (liste_entrepot, ', ' || rec.entrepot);
+       	   end if; 
+       	  
+       end if; 
+      
+     end loop;   
+
+     if liste_entrepot is not null then
+        retour = 2;
+     end if;
+  end;
+
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+  /*Y-a-t-il une alerte en cours ? */  
+
+
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte in ('GF_DOW_WMS_CREATED_1','GF_DOW_WMS_CREATED_2')
+    and date_fin is null;
+
+if retour = 0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte   = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_3: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('calcul_alerte_do_web_wms_created',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+	  
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message,complement_message  )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0,liste_entrepot);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement calcul_alerte_do_web_wms_created() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_jg_sages
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_jg_sages()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$  
+declare 
+
+tot_nb_mag integer := 0;
+nb_mag integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte dÃ©ja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_JG_SAGES'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_JG_SAGES() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+/* Calcul de l'alerte : A-t-on integre de do depuis X d'heure */
+if retour=0 then
+
+  n_alerte := 'JG_SAGES_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into nb_mag
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NB_MAG'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+ 
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||nb_mag);
+ 
+  -- Calcul les magasins sans propositions de DO une fois par jour (8H35)  
+  select COUNT(ID_MAGASIN)
+    into tot_nb_mag
+    from "COMMANDES".tb_sages
+   where indicateur_run ='ko';
+
+  if tot_nb_mag is null or tot_nb_mag >= nb_mag then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='JG_SAGES_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_JG_SAGES',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_JG_SAGES() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_mod_allocation
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_mod_allocation()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+nb_heures_mod_all integer := 0;
+indic_Model_allocation integer := 0;
+num_seq integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte deja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_MOD_ALLOCATION'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'DEBUT traitement calcul_alerte_mod_allocation() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+/* Calcul de l'alerte : A-t-on integre de do depuis X d'heure dans le modele ALLOCATION du MODELE_EXEC  */
+if retour=0 then
+
+  n_alerte := 'FR_MOD_ALLOCATION_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into nb_heures_mod_all
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NB_HEURES_MOD_ALL'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+ 
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_PARAMETRE : '||nb_heures_mod_all);
+ 
+  -- vérifier  le modele allocation =3 pendant X heures'  
+  select indicateur_feu
+      into indic_Model_allocation
+    from "COMMANDES".tb_modeles_exec
+   where date_calcul >= (now() - nb_heures_mod_all * (interval '1 HOURS')) 
+   and template_modele ='Allocation';
+  
+
+  if indic_Model_allocation is null or (indic_Model_allocation is not null and indic_Model_allocation = 3) then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='FR_MOD_ALLOCATION_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_MOD_ALLOCATION',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement calcul_alerte_mod_allocation() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_mod_do_created
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_mod_do_created()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+declare
+
+NB_HEURES integer := 0;
+indic_model_created integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte dÃ©ja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_MOD_DO_CREATED'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_MOD_DO_CREATED() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+/* Calcul de l'alerte : A-t-on integre de do depuis X d'heure dans le modele DO CREATION  du MODELE_EXEC  */
+if retour is null then
+
+  n_alerte := 'FR_MOD_DO_CREATED_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into NB_HEURES
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NB_MOD_DO_CREATED'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+ 
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||NB_HEURES);
+ 
+  -- vérifier  le modele allocation =3 pendant X heures' 
+  select indicateur_feu
+      into indic_model_created
+    from "COMMANDES".tb_modeles_exec
+   where date_calcul >= (now() - NB_HEURES * (interval '1 HOURS')) 
+   and template_modele ='DO Creation';
+  
+
+  if indic_model_created is null or (indic_model_created is not null and indic_model_created = 3) then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='FR_MOD_DO_CREATED_1' 
+    and date_fin is null;
+
+if retour is null then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_MOD_DO_CREATED',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_MOD_DO_CREATED() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                               calcul_alerte_mod_do_release
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".calcul_alerte_mod_do_release()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$ 
+declare
+
+NB_HEURES integer := 0;
+indic_model_release integer := 0;
+n_alerte varchar(30) := null;
+alerte_en_cours integer := null;
+retour integer := 0;
+flg_debug integer := 0;
+/* 
+ 1 : Indicateur est bon pas d'alerte a activer
+ 2 : Alerte a activer
+ 3 : Alerte dÃ©ja en cours
+ 4 : fin de l'alerte
+*/
+
+begin
+
+	-- Recherche du parametre de debug message
+	select valeur_parametre 
+	  into flg_debug
+	  from "COMMANDES".tb_param_globale
+	 where parametre ='DEBUG_CALCUL_ALERTE_MOD_DO_RELEASE'; 
+	
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'Debut traitement CALCUL_ALERTE_MOD_DO_RELEASE() ');
+ 	perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+/* Calcul de l'alerte : A-t-on integre de do depuis X d'heure dans le modele 'DO RELEASE' du MODELE_EXEC  */
+ 
+if retour=0 then
+
+  n_alerte := 'FR_MOD_DO_RELEASE_1';
+   
+  -- Recuperateur du parametre de l'alerte  
+  select valeur_parametre
+    into NB_HEURES
+    from "COMMANDES".tb_seuils_alerte
+   where code_parametre ='NB_HEURES'
+     and code_alerte = n_alerte
+     and date_debut_validite <= now()
+     and date_fin_validite is null;
+ 
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'trace_PARAMETRE : '||NB_HEURES);
+ 
+  -- vérifier  le modele allocation =3 pendant X heures'  
+  select indicateur_feu
+      into indic_model_release
+    from "COMMANDES".tb_modeles_exec
+   where date_calcul >= (now() - NB_HEURES * (interval '1 HOURS')) 
+   and template_modele ='DO Release';
+  
+
+  if indic_model_release is null or (indic_model_release is not null and indic_model_release = 3) then
+     retour := 2;
+  end if;  
+ 
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_1 : '||retour);
+
+
+/*Y-a-t-il une alerte en cours ? */
+ select id_alerte 
+   into alerte_en_cours 
+   from "COMMANDES".tb_alerte
+  where code_alerte ='FR_MOD_DO_RELEASE_1' 
+    and date_fin is null;
+
+if retour=0 then
+
+   if alerte_en_cours is not null then
+     -- mise Ã  jour de la date de fin de l'alerte pour la terminer
+     update "COMMANDES".tb_alerte
+        set date_fin = now(),
+            status_alerte  = 4
+      where id_alerte = alerte_en_cours;
+    
+     retour := 4;
+   else
+     retour := 1;
+   end if;
+  
+else 
+   
+   if alerte_en_cours is not null then
+      retour := 3;
+   end if;
+  
+end if;
+
+perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'TRACE_2: '||retour);
+
+/* historisation de l'execution du traitement */
+insert into "COMMANDES".tb_traitement_alerte (nom_traitement,date_traitement,status_traitement)
+	   values ('CALCUL_ALERTE_MOD_DO_RELEASE',	now(), retour);
+	  
+/* Insertion de l'alerte a signaler */
+if retour = 2 then
+  insert into "COMMANDES".tb_alerte (id_traitement,code_alerte,date_debut,status_alerte,status_message )
+  values (currval('"COMMANDES".tb_traitement_alerte_id_traitement_seq'),n_alerte,now(),1,0);
+end if;
+
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'FIN traitement CALCUL_ALERTE_MOD_DO_RELEASE() ');
+ perform "COMMANDES".DEBUG_MESSAGE(flg_debug,'*********************************************************************************************************');
+
+return retour;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                              debug_message
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".debug_message(flg_ecriture integer, texte character varying)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+
+begin
+
+ if flg_ecriture = 1 then 
+	insert into "COMMANDES".msg_debug (msg) values (texte);
+ end if;
+
+return 0;
+
+end;
+
+$function$
+;
+/****************************************************************************************************************************************************************************************************
+                                             insert_tb_periode_agregation
+**********************************************************************************************/
+CREATE OR REPLACE FUNCTION "COMMANDES".insert_tb_periode_agregation(timestamp without time zone, timestamp without time zone, integer)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  DATE_DEB  timestamp := $1;
+BEGIN
+
+  WHILE DATE_DEB < $2 LOOP
+
+	INSERT	INTO TB_PERIODE_AGREGATION (DATE_DEBUT_PERIODE,DATE_FIN_PERIODE, TYPE_AGREGATION)
+	VALUES (DATE_DEB,DATE_DEB + ($3 * interval '1 minute'),$3);
+ 
+	DATE_DEB := DATE_DEB + ($3 * interval '1 minute');
+END loop;
+return 0;
+EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            return 1;
+end;
+$function$
+;
